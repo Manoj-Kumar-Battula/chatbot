@@ -1,0 +1,89 @@
+openapi: 3.0.3
+info:
+  title: PNW Knowledge Chatbot API
+  version: 0.1.0
+  description: Public contract for a source-grounded university Q&A service.
+paths:
+  /api/chat/message:
+    post:
+      summary: Ask the chatbot a question.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionRequest'
+      responses:
+        '200':
+          description: Chatbot answer generated from official sources.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnswerResponse'
+        '400':
+          description: Invalid request.
+components:
+  schemas:
+    QuestionRequest:
+      type: object
+      required:
+        - question
+      properties:
+        question:
+          type: string
+          description: Natural-language question from student.
+        campus:
+          type: string
+          nullable: true
+          enum: [Hammond, Westville]
+          description: Optional campus context when relevant.
+        term:
+          type: string
+          nullable: true
+          description: Optional term context supplied with the question.
+        course:
+          type: string
+          nullable: true
+          description: Optional course context supplied with the question.
+    AnswerResponse:
+      type: object
+      required:
+        - answer
+        - citations
+        - answer_type
+      properties:
+        answer:
+          type: string
+        answer_type:
+          type: string
+          enum: [direct_answer, clarification_required, insufficient_info, escalation_required]
+        citations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Citation'
+        escalation_destination:
+          type: string
+          nullable: true
+        campus_used:
+          type: string
+          nullable: true
+    Citation:
+      type: object
+      required:
+        - title
+        - url
+        - excerpt
+      properties:
+        title:
+          type: string
+        url:
+          type: string
+          format: uri
+        excerpt:
+          type: string
+        source_date:
+          type: string
+          nullable: true
+        freshness_status:
+          type: string
+          enum: [current, stale, unknown, missing]
