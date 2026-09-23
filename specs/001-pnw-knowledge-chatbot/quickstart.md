@@ -1,67 +1,86 @@
 # Quickstart: PNW Knowledge Chatbot
 
-## Purpose
+## Prerequisites
 
-This guide validates the end-to-end behavior of a source-grounded PNW chatbot before implementation and during evaluation.
+- Docker and Docker Compose
+- Git
+- A curated set of official PNW HTML/PDF sources for ingestion
+- Optional model/embedding provider credentials supplied through local environment variables; never commit secrets
 
-## Validation setup
+## Start the local stack
 
-- Use the curated official PNW corpus, including official webpages, PDFs,
-  linked documents, catalog content, schedules, and student-service pages.
-- Confirm that each source exposes its official URL and available date or
-  freshness information.
-- Use the chatbot interface or service selected for implementation to run the
-  scenarios below.
+From the repository root:
 
-No particular programming language, database, hosting platform, or runtime
-command is required by this validation guide.
+```bash
+docker compose up --build
+```
 
-## Validation scenarios
+Expected services:
 
-### 1. General university information
+- React frontend at `http://localhost:5173`
+- FastAPI backend at `http://localhost:8000`
+- OpenAPI documentation at `http://localhost:8000/docs`
+- PostgreSQL/pgvector at the Compose database service
 
-Ask: "When is the registration deadline for fall semester?"
+Run database migrations and load the curated corpus using the project scripts defined during implementation. The database must have the pgvector extension enabled by migration before retrieval tests run.
 
-Expected outcome:
-- Answer includes a direct statement.
-- At least one official PNW citation is attached.
-- No unsupported claim is made.
+## Contract validation
 
-### 2. Campus-required topic without campus
+Validate `POST /api/chat/message` against [`contracts/chatbot-api.yaml`](contracts/chatbot-api.yaml).
 
-Ask: "Where is the parking office?"
+Example request:
 
-Expected outcome:
-- System asks for Hammond or Westville if campus-specific policy is required.
-- It does not guess a campus before clarification.
-
-### 3. Unsupported or personalized request
-
-Ask: "Can you register me for a class?"
+```bash
+curl -sS http://localhost:8000/api/chat/message \
+  -H 'content-type: application/json' \
+  -d '{"question":"When is the registration deadline for fall semester?","term":"Fall 2026"}'
+```
 
 Expected outcome:
-- System refuses to perform the action.
-- It explains the limitation and provides the proper contact or process.
 
-### 4. Stale or missing source metadata
+- A direct answer only when current official evidence supports it.
+- `answer_type` is `direct_answer` with one or more citations.
+- Each citation contains a stable source identity, official URL, excerpt, and freshness status.
 
-Ask: "Does this rule still apply if the source is dated 2019?"
+## Required behavior scenarios
 
-Expected outcome:
-- System checks freshness metadata.
-- If the source is stale or date is missing, it declines to answer confidently and points to a more current official source or office.
+### Campus clarification
 
-### 5. Multi-source answer aggregation
+Ask: `Where is the parking office?`
 
-Ask: "What are the course prerequisites and campus notes for a specific program?"
+Expected: If the applicable source is campus-specific, return `clarification_required` asking for Hammond or Westville. Do not assume a campus.
 
-Expected outcome:
-- The answer combines relevant catalog and campus-specific qualifiers.
-- Citations are included for each supporting source.
+### Unsupported or personalized request
 
-## Success checks
+Ask: `Can you register me for a class?`
 
-- All direct answers include official citations.
-- Campus-dependent questions ask for clarification when campus is missing.
-- Unsupported actions are routed to escalation or guidance.
-- Stale or missing source dates are handled as insufficient evidence.
+Expected: Return `escalation_required` or `insufficient_info`, state that the system cannot perform the action, and provide an official process or destination.
+
+### Stale or missing source metadata
+
+Use a source dated 2019 or with no date and ask whether the rule still applies.
+
+Expected: Do not provide a confident direct answer. Return an explicit limitation and current official source or office when available.
+
+### Multi-source catalog answer
+
+Ask for prerequisites, offerings, and campus notes for a course or program.
+
+Expected: Combine only related catalog evidence and preserve prerequisite, offering, term, and campus qualifiers in the answer and citations.
+
+### Linked document and schedule-table preservation
+
+Ask a parking question answered by a linked child page, then ask a term-specific deadline represented in a schedule table.
+
+Expected: Cite the linked official page for parking and preserve the correct term/event/date/add-drop/refund relationship for the schedule answer.
+
+## Automated validation
+
+Run the backend unit and contract suites, PostgreSQL/pgvector integration suite, frontend tests, and the corpus evaluation script in CI. The required checks are:
+
+- Direct claims have supporting official citations.
+- Campus-dependent questions without campus context always clarify.
+- Unsupported, conflicting, stale, and personalized requests never produce unsupported claims.
+- Citation IDs resolve to stored source versions and excerpts.
+- Vector dimensions/model identity match the configured embedding schema.
+- Docker Compose health checks and API smoke tests pass.

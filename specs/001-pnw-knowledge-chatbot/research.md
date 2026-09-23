@@ -1,65 +1,49 @@
 # Research: PNW Knowledge Chatbot
 
-## Decision: source-grounded retrieval with explicit guardrails
+## Decision: separate React and FastAPI applications
 
-The implementation will use a retrieval-first architecture that indexes official PNW sources, resolves campus qualifiers, and enforces a strict abstention policy whenever the answer is unsupported, personalized, or stale.
+**Rationale:** The backend owns retrieval, citations, freshness, refusal, and escalation logic; the React client owns chat state and presentation. A typed OpenAPI boundary prevents the UI from depending on persistence or retrieval internals.
 
-### Rationale
+**Alternatives considered:** A single application serving a bundled frontend is simpler for a prototype, but separate containers provide clearer boundaries and independent deployment without changing the public API.
 
-- The feature specification prioritizes accuracy and source traceability over completeness.
-- The corpus is intentionally limited to official PNW pages, PDFs, catalogs, and linked pages, which reduces unsupported answer risk.
-- Student questions often depend on campus, term, and policy context; those qualifiers must be kept in metadata and answer generation.
-- Many questions involve generic information, but the chatbot must separate general guidance from human or transactional processes.
+## Decision: FastAPI with typed schemas and layered persistence
 
-### Alternatives considered
+**Rationale:** FastAPI response models validate and document the public contract. Pydantic Settings provides typed environment configuration. SQLAlchemy 2, Alembic, and Psycopg 3 provide explicit database sessions and migrations. Routers call services, services call repositories, and database models remain separate from API schemas.
 
-1. Pure LLM-answer generation without retrieval
-   - Rejected because it risks inventing or overgeneralizing answers and violates the no-guessing requirement.
+**Alternatives considered:** A synchronous database stack is viable, but the plan selects explicit async-compatible boundaries so request handling and integration tests do not block on database work. A module-global settings singleton is avoided because test overrides and environment validation are clearer with a cached settings dependency.
 
-2. Retrieval without source freshness tracking
-   - Rejected because outdated or incomplete sources could produce wrong policy guidance.
+## Decision: PostgreSQL with pgvector and hybrid retrieval
 
-3. Open-web retrieval or student forum content
-   - Rejected because the spec requires official PNW sources only.
+**Rationale:** PostgreSQL stores source metadata, immutable versions, full-text indexes, and embeddings in one system. Exact/full-text retrieval is important for course codes, dates, terms, and policy names; pgvector adds semantic matching. Hard metadata filters apply official-domain, current-version, campus, and term constraints before generation.
 
-4. Personalized student-data access in the initial release
-   - Rejected because the spec explicitly excludes authenticated or account-level student record access.
+**Alternatives considered:** Vector-only retrieval is rejected because it can miss exact dates and qualifiers. A separate vector database is unnecessary for the initial small-to-medium corpus and would duplicate source metadata and transaction handling.
 
-## Research Findings
+## Decision: structure-preserving document ingestion
 
-### Source freshness and staleness
+**Rationale:** Parse PDFs and HTML into a lossless intermediate representation before chunking. Preserve heading paths, page/anchor references, links, table headers and rows, campus scope, term scope, course codes, parser version, and source version on chunks. Schedule rows must retain their term/event/date/refund relationships; catalog chunks must retain prerequisite/offering/campus relationships.
 
-Decision: Missing or stale source dates should block a confident answer. If a document is older than the current policy cycle or no date is available, the system should say it cannot confirm the answer and cite the official source or contact.
+**Alternatives considered:** Flattened text-only ingestion and PyMuPDF-only extraction are faster to start but are insufficient for complex tables, linked content, reading order, and precise citations. A structure-aware parser with a fallback is preferred.
 
-Rationale: This matches the requirement to prioritize accuracy and decline unsupported claims.
+## Decision: immutable source versions and explicit freshness
 
-### Student data access
+**Rationale:** A canonical URL/document identity receives immutable versions keyed by content hash. Changed content is parsed and validated before a transaction marks the new version current; prior versions remain available for reproducible citations. Missing or stale dates produce `unknown` or `stale` status rather than silently becoming current.
 
-Decision: The chatbot must use only general public PNW university information and must never access, infer, or use student records, personal history, or account data. Campus, term, and course context may be used only when supplied as context for a general-information question; it must not provide access to student records or account data.
+**Alternatives considered:** In-place replacement is simpler but loses historical evidence and makes citation reproducibility difficult. Deleting inaccessible sources is rejected; they should be marked unavailable.
 
-Rationale: This keeps the chatbot informational and compliant with the scope constraints.
+## Decision: deterministic grounding and refusal gates
 
-### Handling unanswered or uncertain questions
+**Rationale:** Classify campus dependence, term dependence, personal/transactional requests, and unsupported topics before retrieval. Require relevant official evidence, detect conflicts, validate claim-to-citation mappings, and reject unknown citation IDs or stale/ambiguous evidence. Return a limitation plus an official escalation destination when a direct answer is not safe.
 
-Decision: For unsupported, conflicting, or ambiguous questions, the chatbot must say it cannot confirm, explain what is missing, and direct the student to the appropriate official office or source.
+**Alternatives considered:** Post-hoc citation insertion or unconstrained LLM output may produce plausible but unsupported claims and is incompatible with the accuracy requirements.
 
-Rationale: This aligns with both the user story around escalations and the acceptance requirements for uncertainty handling.
+## Decision: Docker Compose locally and separate production images
 
-### Campus-aware behavior
+**Rationale:** Compose provides reproducible local orchestration for React, FastAPI, and PostgreSQL/pgvector. Separate frontend and backend images keep runtime configuration and scaling boundaries explicit; secrets remain environment-managed and never enter images.
 
-Decision: When a campus-dependent question arrives without a campus, the chatbot must ask whether the student is at Hammond or Westville before giving a campus-specific answer.
+**Alternatives considered:** Native frontend development with only a containerized backend is faster for some teams, but a fully containerized local stack better matches deployment and integration testing.
 
-Rationale: Campus-specific policy applications are treated as required context rather than optional context.
+## Decision: contract and integration validation
 
-### Corpus scope
+**Rationale:** Test `POST /api/chat/message` against the OpenAPI schema, use HTTPX for API tests, and run PostgreSQL/pgvector integration tests rather than substituting SQLite. Add React tests for request/response rendering and a Docker Compose smoke test.
 
-Decision: The initial knowledge corpus must include only authoritative PNW sources and linked official documents: student handbook, student conduct policy, information services policies, parking regulations, academic catalog, academic schedule, and relevant official support pages.
-
-Rationale: The feature is designed as a trusted student information assistant, not a general web assistant.
-
-## Design implications
-
-- All source documents must have metadata for source URL, source type, document date, campus applicability, and coverage topic.
-- Retrieval should rank campus and term-specific matches before generic matches.
-- Responses must include explicit citation blocks and escalation guidance when the answer is uncertain.
-- Response generation must include a final grounding check that rejects unsupported claims.
+**Alternatives considered:** Frontend-only mocks and SQLite are useful for isolated unit tests but cannot validate the pgvector extension, vector operators, transaction behavior, or end-to-end citation contract.

@@ -16,56 +16,67 @@ description: "Implementation task list for the PNW Knowledge Chatbot"
 - Backend application: `backend/app/`
 - Backend scripts: `backend/scripts/`
 - Backend tests: `backend/tests/`
-- Dependencies: `backend/requirements.txt`
+- Frontend application: `frontend/`
+- Infrastructure: `docker-compose.yml`, `backend/Dockerfile`, and `frontend/Dockerfile`
+- Dependencies: `backend/requirements.txt` and `frontend/package.json`
 
 ## Phase 1: Setup
 
-**Purpose**: Initialize the technology-neutral project structure described by the plan without adding capabilities outside the initial release.
+**Purpose**: Initialize the project structure and selected stack.
 
 - [x] T001 Create the backend package structure in `backend/app/`, including `api/`, `models/`, `services/`, `corpus/`, `prompts/`, and `config/`.
 - [x] T002 Create the backend test and evaluation directories in `backend/tests/contract/`, `backend/tests/integration/`, `backend/tests/unit/`, and `backend/tests/eval/`.
-- [x] T003 [P] Create the application entrypoint and minimal configuration files in `backend/app/main.py` and `backend/app/config/`.
-- [x] T004 [P] Create the dependency manifest in `backend/requirements.txt` for the selected Python 3.11 service dependencies documented in `plan.md`.
+- [x] T003 [P] Create the FastAPI application entrypoint and minimal configuration files in `backend/app/main.py` and `backend/app/config/`.
+- [x] T004 [P] Create the Python dependency manifest in `backend/requirements.txt` for FastAPI, Pydantic Settings, SQLAlchemy, Alembic, Psycopg, pgvector, HTTPX, and pytest.
 - [x] T005 [P] Create corpus import and answer validation script entrypoints in `backend/scripts/import_corpus.py` and `backend/scripts/validate_answers.py`.
+- [x] T006 [P] Create the React TypeScript/Vite application shell and dependency manifest in `frontend/package.json`, `frontend/tsconfig.json`, `frontend/vite.config.ts`, and `frontend/src/`.
+- [x] T007 [P] Create the backend and frontend container definitions in `backend/Dockerfile` and `frontend/Dockerfile`.
+- [x] T008 [P] Create the local Docker Compose stack for FastAPI, React, and PostgreSQL with pgvector in `docker-compose.yml` and `.env.example`.
 
 ---
 
 ## Phase 2: Foundational
 
-**Purpose**: Establish shared source, response, and API foundations before implementing individual user stories.
+**Purpose**: Establish shared API, persistence, source, retrieval, and deployment foundations before user-story work.
+
+**⚠️ CRITICAL**: No user story work can begin until this phase is complete.
+
+- [ ] T009 Configure typed environment settings, CORS, structured logging, and shared error handling in `backend/app/config/settings.py`, `backend/app/main.py`, and `backend/app/api/deps.py`.
+- [ ] T010 Define shared `QuestionRequest`, `AnswerResponse`, and `Citation` schemas in `backend/app/api/schemas/chatbot.py` matching `specs/001-pnw-knowledge-chatbot/contracts/chatbot-api.yaml`, including non-empty question validation, answer types, source status, limitations, and citation provenance.
+- [ ] T011 [P] Define the `StudentQuestion` model in `backend/app/models/student_question.py` with non-empty text, nullable Hammond/Westville/unknown campus context, nullable term/course context, and `created_at`.
+- [ ] T012 [P] Define the `OfficialSource` model in `backend/app/models/official_source.py` with official URL validation, source types `webpage`, `pdf`, `catalog_entry`, `policy`, `schedule`, `linked_document`, and `office_page`, campus applicability, topic tags, and freshness status `current`, `stale`, or `unknown`.
+- [ ] T013 [P] Define `OfficialSourceVersion` and `RetrievalChunk` models in `backend/app/models/official_source_version.py` and `backend/app/models/retrieval_chunk.py`, preserving immutable content hashes, parser metadata, heading paths, page/anchor references, links, table relationships, campus scope, term scope, course codes, and pgvector metadata.
+- [ ] T014 [P] Define the `Citation`, `ChatbotAnswer`, and `EscalationDestination` models in `backend/app/models/citation.py`, `backend/app/models/chatbot_answer.py`, and `backend/app/models/escalation_destination.py`, enforcing traceable excerpts, valid answer types, official destinations, and direct-answer citation requirements.
+- [ ] T015 Configure SQLAlchemy 2 database sessions, declarative metadata, and repository dependencies in `backend/app/db/session.py`, `backend/app/db/base.py`, and `backend/app/api/deps.py`.
+- [ ] T016 Configure Alembic and create the initial PostgreSQL schema migration, including the pgvector extension, source/version/chunk tables, full-text fields, indexes, and vector dimension metadata in `backend/alembic.ini`, `backend/alembic/env.py`, and `backend/app/db/migrations/`.
+- [ ] T017 Implement source freshness classification and response-facing statuses `current`, `stale`, `unknown`, and `missing` in `backend/app/services/source_freshness/`.
+- [ ] T018 Implement official PDF and HTML loading into a structure-preserving intermediate representation in `backend/app/corpus/loaders/`, retaining source URL, source type, dates, parser status, headings, links, tables, campus applicability, topic tags, and freshness metadata.
+- [ ] T019 Implement source identity, immutable version replacement, and current-version selection in `backend/app/corpus/` and `backend/app/services/retrieval/`, using canonical source identity and content hashes while retaining superseded versions.
+- [ ] T020 Implement the shared PostgreSQL/pgvector repository interface and hybrid full-text/vector retrieval in `backend/app/services/retrieval/`, including embedding-model/dimension validation and official-domain, current-version, campus, and term filters.
+- [ ] T021 Configure Docker Compose health checks, migration startup ordering, backend CORS environment, frontend API base URL, and PostgreSQL/pgvector connectivity in `docker-compose.yml`, `backend/app/config/`, and `frontend/src/api/`.
 
 **Checkpoint**: Foundation ready; user story implementation can begin.
-
-- [ ] T006 Define shared request and response schemas for `QuestionRequest`, `AnswerResponse`, and `Citation` in `backend/app/api/schemas/chatbot.py` according to `contracts/chatbot-api.yaml`.
-- [ ] T007 [P] Define the `StudentQuestion` model in `backend/app/models/student_question.py` with non-empty `text`, nullable Hammond/Westville/unknown `campus_context`, nullable `term_context`, nullable `course_context`, and `created_at`.
-- [ ] T008 [P] Define the `OfficialSource` model in `backend/app/models/official_source.py` with `source_type` values `webpage`, `pdf`, `catalog_entry`, `policy`, `schedule`, `linked_document`, and `office_page`; official URL validation; campus applicability; document date; topic tags; and `freshness_status` values `current`, `stale`, and `unknown`.
-- [ ] T009 [P] Define the `Citation` model in `backend/app/models/citation.py` with a traceable `source_id`, non-invented `excerpt_text`, optional `section_ref`, and optional `page_or_anchor`.
-- [ ] T010 [P] Define the `ChatbotAnswer` model in `backend/app/models/chatbot_answer.py` with `answer_type` values `direct_answer`, `clarification_required`, `insufficient_info`, and `escalation_required`, citations, optional campus used, optional escalation destination, and `created_at`.
-- [ ] T011 [P] Define the `EscalationDestination` model in `backend/app/models/escalation_destination.py` with official PNW `name`, `office_type` values `advisor`, `department`, `office`, and `policy_page`, and optional official `url`.
-- [ ] T012 Configure shared error handling and structured application logging in `backend/app/main.py` and `backend/app/config/` without adding authentication or student-record access.
-- [ ] T013 Implement official-source corpus loading for PDF and HTML documents in `backend/app/corpus/loaders/`, preserving source URL, source type, document date, campus applicability, topic tags, and freshness status.
-- [ ] T014 Implement the shared retrieval interface in `backend/app/services/retrieval/` for official sources, retaining section, page, table, term, campus, and linked-document relationships needed for citations.
-- [ ] T015 Implement source freshness classification and stale/missing-source refusal inputs in `backend/app/services/source_freshness/`, including `current`, `stale`, `unknown`, and `missing` response-facing statuses.
 
 ---
 
 ## Phase 3: User Story 1 - Find an answer to a university question (Priority: P1) 🎯 MVP
 
-**Goal**: Answer supported general PNW questions with clear, source-linked responses or an explicit limitation and escalation path.
+**Goal**: Answer supported general PNW questions with concise, source-linked responses or an explicit limitation and escalation path.
 
-**Independent Test**: Ask representative questions about policies, deadlines, registration, academic standing, grade appeals, financial aid, course requirements, prerequisites, graduation, parking, programs, and student services; verify that supported answers are clear and cite official PNW sources, while unsupported answers do not guess.
+**Independent Test**: Ask representative policy, deadline, registration, academic standing, grade appeal, financial aid, course, graduation, parking, program, and student-service questions; verify supported answers cite official PNW evidence and unsupported answers do not guess.
 
 ### Implementation
 
-- [ ] T016 [US1] Implement general-question retrieval and source selection in `backend/app/services/retrieval/`, limited to the curated official PNW corpus.
-- [ ] T017 [US1] Implement citation construction in `backend/app/services/answer_grounding/` so every substantive answer links to traceable official excerpts when links are available.
-- [ ] T018 [US1] Implement grounded answer generation in `backend/app/services/answer_grounding/` that provides a concise direct answer only when the retrieved sources support it and otherwise states the limitation.
-- [ ] T019 [US1] Implement escalation destination selection in `backend/app/services/escalation/` using only official PNW offices, advisors, departments, policy pages, and contacts represented in the corpus.
-- [ ] T020 [US1] Implement `POST /api/chat/message` in `backend/app/api/routes/chat.py` using the `QuestionRequest` and `AnswerResponse` schemas from `backend/app/api/schemas/chatbot.py`.
-- [ ] T021 [US1] Wire the chat route through retrieval, freshness checks, answer grounding, citations, and escalation in `backend/app/api/routes/chat.py` and `backend/app/services/`.
-- [ ] T022 [US1] Reject unsupported claims and action requests such as registration, schedule changes, form submission, or academic decisions in `backend/app/services/answer_grounding/` and return `insufficient_info` or `escalation_required`.
+- [ ] T022 [US1] Implement general-question classification and retrieval selection in `backend/app/services/retrieval/`, limited to current official PNW sources and preserving source qualifiers.
+- [ ] T023 [US1] Implement citation construction and evidence lookup in `backend/app/services/answer_grounding/`, requiring stable source/version/chunk IDs, exact excerpts, official URLs, and section/page/anchor metadata.
+- [ ] T024 [US1] Implement grounded answer generation in `backend/app/services/answer_grounding/`, mapping each substantive claim to retrieved evidence and returning a limitation when evidence is insufficient, stale, conflicting, or missing.
+- [ ] T025 [US1] Implement official escalation destination selection in `backend/app/services/escalation/` using only corpus-backed PNW advisors, departments, offices, and policy pages.
+- [ ] T026 [US1] Implement `POST /api/chat/message` in `backend/app/api/routes/chat.py` using the contract schemas from `backend/app/api/schemas/chatbot.py`.
+- [ ] T027 [US1] Wire the FastAPI chat route through classification, hybrid retrieval, freshness checks, grounding, citations, and escalation in `backend/app/api/routes/chat.py` and `backend/app/services/`.
+- [ ] T028 [US1] Add React chat submission, loading, error, answer, citation, limitation, and escalation rendering in `frontend/src/api/chat.ts`, `frontend/src/hooks/useChat.ts`, and `frontend/src/components/`.
+- [ ] T029 [US1] Reject unsupported claims and action requests such as registration, schedule changes, form submission, or academic decisions in `backend/app/services/answer_grounding/`, returning `insufficient_info` or `escalation_required`.
 
-**Checkpoint**: User Story 1 is independently usable for general PNW information questions and unsupported-question escalation.
+**Checkpoint**: The FastAPI API and React client provide an independently usable general-information MVP with citations and safe refusal.
 
 ---
 
@@ -73,35 +84,36 @@ description: "Implementation task list for the PNW Knowledge Chatbot"
 
 **Goal**: Use Hammond or Westville context when required and request it before giving a campus-specific answer.
 
-**Independent Test**: Ask campus-dependent questions with Hammond, Westville, and no campus; verify that the stated campus is used, missing campus context triggers clarification, and campus-independent questions do not request unnecessary context.
+**Independent Test**: Ask campus-dependent questions with Hammond, Westville, and no campus; verify the stated campus is used, missing context triggers clarification, and campus-independent questions do not request unnecessary context.
 
 ### Implementation
 
-- [ ] T023 [P] [US2] Implement campus-context extraction and validation for Hammond and Westville in `backend/app/services/retrieval/`.
-- [ ] T024 [US2] Implement campus applicability filtering for `OfficialSource` records in `backend/app/services/retrieval/`, keeping campus context on the question and source rather than creating a separate Campus entity.
-- [ ] T025 [US2] Implement `clarification_required` responses for campus-dependent questions without campus context in `backend/app/services/answer_grounding/`.
-- [ ] T026 [US2] Update `POST /api/chat/message` handling in `backend/app/api/routes/chat.py` to return `campus_used` and to avoid requesting campus context for campus-independent questions.
-- [ ] T027 [US2] Preserve campus qualifiers in citations and answer text in `backend/app/services/answer_grounding/` so the student can understand which campus the guidance applies to.
+- [ ] T030 [P] [US2] Implement campus-context extraction and validation for Hammond and Westville in `backend/app/services/retrieval/campus_context.py`.
+- [ ] T031 [US2] Implement campus applicability filtering for `OfficialSource` and `RetrievalChunk` records in `backend/app/services/retrieval/filters.py`, retaining campus context on questions and sources without introducing a separate Campus entity.
+- [ ] T032 [US2] Implement `clarification_required` responses for campus-dependent questions without campus context in `backend/app/services/answer_grounding/campus_clarification.py`.
+- [ ] T033 [US2] Update `POST /api/chat/message` in `backend/app/api/routes/chat.py` to return `campus_used` and avoid requesting campus context for campus-independent questions.
+- [ ] T034 [US2] Preserve campus qualifiers in answer text, citation metadata, and React rendering in `backend/app/services/answer_grounding/` and `frontend/src/components/CitationList.tsx`.
 
-**Checkpoint**: User Stories 1 and 2 work independently; campus-specific answers never assume Hammond or Westville.
+**Checkpoint**: Campus-specific answers never assume Hammond or Westville, and both campuses remain independently testable through the API and UI.
 
 ---
 
 ## Phase 5: User Story 3 - Know when human help is needed (Priority: P1)
 
-**Goal**: Keep the chatbot informational, never access student records, and direct personalized, transactional, official-decision, or unsupported requests to appropriate human help.
+**Goal**: Keep the chatbot informational and direct personalized, transactional, official-decision, or unsupported requests to appropriate human help.
 
-**Independent Test**: Ask for registration, schedule changes, form submission, academic decisions, personal-record advice, and unsupported information; verify that the chatbot does not perform or decide, does not access or infer student data, and provides an official limitation and escalation path.
+**Independent Test**: Ask for registration, schedule changes, form submission, academic decisions, personal-record advice, and unsupported information; verify no action or decision is simulated and an official limitation/escalation path is provided.
 
 ### Implementation
 
-- [ ] T028 [P] [US3] Implement request classification for transactional, personalized, official-decision, and unsupported questions in `backend/app/services/answer_grounding/`.
-- [ ] T029 [P] [US3] Enforce the general-public-information-only boundary in `backend/app/services/answer_grounding/` and `backend/app/api/routes/chat.py`; never read, infer, or use student records, personal history, or account data.
-- [ ] T030 [US3] Implement limitation messages and `escalation_required` responses in `backend/app/services/escalation/` using only known official PNW destinations.
-- [ ] T031 [US3] Ensure supplied campus, term, and course values are treated only as context for a general-information question in `backend/app/api/schemas/chatbot.py` and `backend/app/services/`.
-- [ ] T032 [US3] Add mixed-request handling in `backend/app/services/answer_grounding/` so supported general information is answered while personalized or transactional portions are escalated.
+- [ ] T035 [P] [US3] Implement classification for transactional, personalized, official-decision, unsupported, and mixed requests in `backend/app/services/answer_grounding/request_classification.py`.
+- [ ] T036 [P] [US3] Enforce the general-public-information-only boundary in `backend/app/services/answer_grounding/` and `backend/app/api/routes/chat.py`; never read, infer, or use student records, personal history, or account data.
+- [ ] T037 [US3] Implement limitation messages and `escalation_required` responses in `backend/app/services/escalation/` using only known official PNW destinations and contract-supported fields.
+- [ ] T038 [US3] Ensure supplied campus, term, and course values are used only as context for general-information retrieval in `backend/app/api/schemas/chatbot.py` and `backend/app/services/`.
+- [ ] T039 [US3] Add mixed-request handling so supported general information is answered while personalized or transactional portions are escalated in `backend/app/services/answer_grounding/mixed_requests.py`.
+- [ ] T040 [US3] Render refusal, limitation, and escalation states clearly in `frontend/src/components/AnswerPanel.tsx` without presenting unavailable actions as completed.
 
-**Checkpoint**: User Stories 1–3 work independently without authenticated student access or simulated university actions.
+**Checkpoint**: User Stories 1–3 work without authentication, student records, simulated university actions, or unsupported claims.
 
 ---
 
@@ -109,16 +121,16 @@ description: "Implementation task list for the PNW Knowledge Chatbot"
 
 **Goal**: Preserve relationships and qualifiers across official PDFs, HTML pages, linked documents, structured tables, catalogs, schedules, and fragmented content.
 
-**Independent Test**: Ask parking, academic schedule, and catalog questions against representative corpus content; verify that linked sources, term/date relationships, prerequisites, offerings, and campus qualifiers remain accurate and cited.
+**Independent Test**: Ask parking, academic schedule, and catalog questions against representative corpus content; verify linked sources, term/date relationships, prerequisites, offerings, and campus qualifiers remain accurate and cited.
 
 ### Implementation
 
-- [ ] T033 [P] [US4] Implement PDF and HTML document extraction for headings, definitions, numbered sections, links, and structured tables in `backend/app/corpus/loaders/`.
-- [ ] T034 [P] [US4] Implement linked-page and linked-document traversal for official PNW parking and policy content in `backend/app/corpus/loaders/`.
-- [ ] T035 [P] [US4] Preserve academic schedule relationships among term, event, date, add/drop period, and refund percentage in `backend/app/corpus/loaders/` and `backend/app/services/retrieval/`.
-- [ ] T036 [P] [US4] Preserve catalog relationships among course requirements, prerequisites, offerings, campus applicability, expandable content, and related sections in `backend/app/corpus/loaders/` and `backend/app/services/retrieval/`.
-- [ ] T037 [US4] Update answer grounding in `backend/app/services/answer_grounding/` to combine related official citations without mixing unrelated sections, table cells, terms, campuses, or linked documents.
-- [ ] T038 [US4] Update corpus replacement handling in `backend/app/corpus/` so revised official source content supersedes outdated content while retaining freshness status and traceable citations.
+- [ ] T041 [P] [US4] Implement PDF and HTML extraction for headings, definitions, numbered sections, links, expandable content, and structured tables in `backend/app/corpus/loaders/`.
+- [ ] T042 [P] [US4] Implement linked-page and linked-document traversal for official PNW parking and policy content in `backend/app/corpus/loaders/link_traversal.py`.
+- [ ] T043 [P] [US4] Preserve academic schedule relationships among term, event, date, add/drop period, and refund percentage in `backend/app/corpus/loaders/schedule.py` and `backend/app/services/retrieval/relationships.py`.
+- [ ] T044 [P] [US4] Preserve catalog relationships among course requirements, prerequisites, offerings, campus applicability, expandable content, and related sections in `backend/app/corpus/loaders/catalog.py` and `backend/app/services/retrieval/relationships.py`.
+- [ ] T045 [US4] Update answer grounding to combine related official citations without mixing unrelated sections, table cells, terms, campuses, or linked documents in `backend/app/services/answer_grounding/related_evidence.py`.
+- [ ] T046 [US4] Update corpus replacement handling so revised official source content supersedes outdated content while retaining freshness status and traceable citations in `backend/app/corpus/versioning.py`.
 
 **Checkpoint**: All four user stories are independently testable against the reviewed official source formats.
 
@@ -126,12 +138,14 @@ description: "Implementation task list for the PNW Knowledge Chatbot"
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-**Purpose**: Complete documentation alignment and validate the initial release without introducing deferred operational targets or new capabilities.
+**Purpose**: Align documentation, validate the complete stack, and verify measurable requirements without adding deferred capabilities.
 
-- [ ] T039 [P] Document the implemented validation flow and expected outcomes in `specs/001-pnw-knowledge-chatbot/quickstart.md`.
-- [ ] T040 [P] Verify the API implementation matches `specs/001-pnw-knowledge-chatbot/contracts/chatbot-api.yaml` without adding endpoints, authentication, student records, or infrastructure assumptions.
-- [ ] T041 Run the scenarios in `specs/001-pnw-knowledge-chatbot/quickstart.md` against the curated official PNW corpus and record any requirement gaps in `backend/scripts/validate_answers.py`.
-- [ ] T042 Review all answer paths in `backend/app/services/` for unsupported claims, missing citations, stale-source handling, campus ambiguity, and escalation coverage.
+- [ ] T047 [P] Document the implemented Docker Compose setup, API/UI validation flow, and expected outcomes in `specs/001-pnw-knowledge-chatbot/quickstart.md`.
+- [ ] T048 [P] Verify the FastAPI response and React client types match `specs/001-pnw-knowledge-chatbot/contracts/chatbot-api.yaml` in `backend/tests/contract/` and `frontend/src/types/`.
+- [ ] T049 [P] Add PostgreSQL/pgvector integration validation for extension availability, vector round trips, embedding dimension mismatch, hybrid retrieval ordering, metadata filters, and transaction rollback in `backend/tests/integration/`.
+- [ ] T050 [P] Add Docker Compose smoke validation for backend health, frontend reachability, database readiness, migrations, and `POST /api/chat/message` in `backend/tests/integration/` and `docker-compose.yml`.
+- [ ] T051 Run the scenarios in `specs/001-pnw-knowledge-chatbot/quickstart.md` against the curated official PNW corpus and record requirement gaps in `backend/scripts/validate_answers.py`.
+- [ ] T052 Review all answer paths in `backend/app/services/` and `frontend/src/` for unsupported claims, missing citations, stale-source handling, campus ambiguity, escalation coverage, and accidental student-data access.
 
 ---
 
@@ -139,79 +153,84 @@ description: "Implementation task list for the PNW Knowledge Chatbot"
 
 ### Phase Dependencies
 
-- **Setup (Phase 1)**: No dependencies; creates the project skeleton.
-- **Foundational (Phase 2)**: Depends on Setup and blocks all user story work.
+- **Setup (Phase 1)**: T001–T005 are complete; T006–T008 establish the React, container, and Compose foundations.
+- **Foundational (Phase 2)**: Depends on Setup and blocks all user-story work.
 - **User Stories (Phases 3–6)**: Depend on Foundational completion.
-- **Polish (Phase 7)**: Depends on the desired user stories being complete.
+- **Polish (Phase 7)**: Depends on the desired user stories and the Dockerized stack being complete.
 
 ### User Story Dependencies
 
-- **US1 (P1)**: Starts after Phase 2; no dependency on other user stories and is the MVP.
-- **US2 (P1)**: Starts after Phase 2; integrates with US1's chat flow but can be validated independently.
-- **US3 (P1)**: Starts after Phase 2; integrates with the shared answer flow but can be validated independently.
-- **US4 (P2)**: Starts after Phase 2; improves corpus handling used by US1–US3 and can be validated independently against source-format scenarios.
+- **User Story 1 (P1)**: Starts after Phase 2; MVP API and React chat flow.
+- **User Story 2 (P1)**: Starts after Phase 2 and integrates with US1 retrieval/route behavior; campus handling remains independently testable.
+- **User Story 3 (P1)**: Starts after Phase 2 and integrates with the shared answer flow; refusal behavior remains independently testable.
+- **User Story 4 (P2)**: Starts after Phase 2; improves corpus handling used by US1–US3 and is independently testable with representative source fixtures.
 
 ### Within Each User Story
 
-- Shared models and services precede route integration.
+- Shared models and infrastructure precede story services.
 - Retrieval and freshness decisions precede grounded response generation.
-- Story work should be validated at its checkpoint before moving to the next priority.
-
----
+- Backend contract behavior precedes corresponding UI rendering.
+- Complete and validate each story checkpoint before moving to the next priority.
 
 ## Parallel Execution Examples
 
 ### Foundational phase
 
 ```text
-T007 StudentQuestion model
-T008 OfficialSource model
-T009 Citation model
-T010 ChatbotAnswer model
-T011 EscalationDestination model
-T013 PDF/HTML corpus loaders
-T015 Source freshness classification
+T011 StudentQuestion model
+T012 OfficialSource model
+T013 OfficialSourceVersion and RetrievalChunk models
+T014 Citation, ChatbotAnswer, and EscalationDestination models
+T017 Source freshness classification
+T018 PDF/HTML loaders
+T020 PostgreSQL/pgvector retrieval interface
+```
+
+### User Story 1
+
+```text
+T022 General retrieval selection
+T023 Citation construction
+T025 Escalation destination selection
+T028 React chat rendering
 ```
 
 ### User Story 2
 
 ```text
-T023 Campus context extraction
-T024 Campus applicability filtering
-T025 Missing-campus clarification behavior
+T030 Campus extraction and validation
+T031 Campus applicability filters
 ```
 
 ### User Story 4
 
 ```text
-T033 PDF/HTML extraction
-T034 Linked-page traversal
-T035 Academic schedule relationship preservation
-T036 Catalog relationship preservation
+T041 PDF/HTML extraction
+T042 Linked-page traversal
+T043 Academic schedule relationships
+T044 Catalog relationships
 ```
-
----
 
 ## Implementation Strategy
 
 ### MVP First
 
-1. Complete Phase 1: Setup.
-2. Complete Phase 2: Foundational.
-3. Complete Phase 3: User Story 1.
-4. Validate general answers, official citations, refusal behavior, freshness handling, and escalation.
+1. Retain and verify completed Phase 1 setup tasks.
+2. Complete Phase 2 foundational API, PostgreSQL/pgvector, source, retrieval, React shell, and Docker tasks.
+3. Complete Phase 3 User Story 1.
+4. Validate general answers, official citations, refusal behavior, freshness handling, React rendering, and Docker Compose integration.
 5. Stop for MVP review before adding campus-specific and varied-format enhancements.
 
 ### Incremental Delivery
 
 1. Add User Story 2 for Hammond and Westville clarification.
-2. Add User Story 3 for strict human-escalation and data-boundary handling.
+2. Add User Story 3 for strict human escalation and data-boundary handling.
 3. Add User Story 4 for PDF, HTML, linked-page, schedule-table, and catalog relationships.
-4. Complete cross-cutting contract and quickstart validation.
+4. Complete cross-cutting contract, database, Docker, and quickstart validation.
 
 ### Scope Guardrails
 
 - Use only general public PNW university information.
 - Never access, infer, or use student records, personal history, or account data.
 - Treat supplied campus, term, and course values only as context for general-information questions.
-- Do not add authentication, transactions, personalized advising, health checks, corpus versioning, or operational performance targets.
+- Do not add authentication, transactions, personalized advising, health checks beyond service readiness, or operational performance targets.

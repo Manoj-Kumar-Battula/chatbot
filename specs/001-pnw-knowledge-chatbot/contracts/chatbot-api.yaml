@@ -31,6 +31,7 @@ components:
       properties:
         question:
           type: string
+          minLength: 1
           description: Natural-language question from student.
         campus:
           type: string
@@ -67,13 +68,30 @@ components:
         campus_used:
           type: string
           nullable: true
+          enum: [Hammond, Westville, null]
+        limitation:
+          type: string
+          nullable: true
+          description: Explanation of missing, stale, conflicting, or unsupported evidence.
+        source_status:
+          type: string
+          enum: [supported, stale, unknown, missing, conflicting, unsupported]
+          description: Evidence status used to decide whether the answer can be stated confidently.
     Citation:
       type: object
       required:
+        - source_id
         - title
         - url
         - excerpt
       properties:
+        source_id:
+          type: string
+          description: Stable official source identity.
+        version_id:
+          type: string
+          nullable: true
+          description: Immutable source version used for this citation.
         title:
           type: string
         url:
@@ -87,3 +105,9 @@ components:
         freshness_status:
           type: string
           enum: [current, stale, unknown, missing]
+        section_ref:
+          type: string
+          nullable: true
+        page_or_anchor:
+          type: string
+          nullable: true
