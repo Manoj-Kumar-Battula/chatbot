@@ -4,14 +4,17 @@
 
 - Docker and Docker Compose
 - Git
+- Python 3.11 with `backend/requirements.txt` installed for host-side corpus ingestion
 - A curated set of official PNW HTML/PDF sources for ingestion
-- Optional model/embedding provider credentials supplied through local environment variables; never commit secrets
 
 ## Start the local stack
 
 From the repository root:
 
 ```bash
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r backend/requirements.txt
 docker compose up --build
 ```
 
@@ -22,7 +25,41 @@ Expected services:
 - OpenAPI documentation at `http://localhost:8000/docs`
 - PostgreSQL/pgvector at the Compose database service
 
-Run database migrations and load the curated corpus using the project scripts defined during implementation. The database must have the pgvector extension enabled by migration before retrieval tests run.
+Run database migrations and load the curated corpus. The import script expects at least three PDF/HTML files and their official PNW URLs in `manifest.json` (HTML documents may instead provide a canonical link).
+
+```bash
+cd backend
+alembic -c alembic.ini upgrade head
+cd ..
+python backend/scripts/import_corpus.py ./corpus
+```
+
+Example `corpus/manifest.json`:
+
+```json
+{
+  "policies/registration.html": {
+    "source_url": "https://www.pnw.edu/registrar/registration/",
+    "source_type": "policy",
+    "campus_applicability": ["both"],
+    "topic_tags": ["registration"]
+  },
+  "catalog/programs.pdf": {
+    "source_url": "https://www.pnw.edu/academics/catalog/programs.pdf",
+    "source_type": "pdf",
+    "campus_applicability": ["unknown"],
+    "topic_tags": ["catalog"]
+  },
+  "policies/financial-aid.html": {
+    "source_url": "https://www.pnw.edu/financial-aid/policies/",
+    "source_type": "policy",
+    "campus_applicability": ["both"],
+    "topic_tags": ["financial aid"]
+  }
+}
+```
+
+The CLI runs `sentence-transformers/all-MiniLM-L6-v2` locally on CPU and writes 384-dimensional vectors to pgvector; it does not require an embedding API key. Model weights are downloaded/cached by Sentence Transformers on first use. The command prints processed documents, chunks, model, dimensions, and database record counts.
 
 ## Contract validation
 

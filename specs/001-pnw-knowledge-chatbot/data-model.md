@@ -79,6 +79,7 @@ Fields:
 - `is_current`: boolean
 - `supersedes_version_id`: identifier/null
 - `raw_object_uri`: string/null
+- `raw_content`: original PDF/HTML document bytes/null
 
 State transitions:
 - `discovered -> indexed -> reviewed -> current`
